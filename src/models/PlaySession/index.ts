@@ -58,12 +58,16 @@ export class PlaySession {
       const availableSuits = gameSuits.filter((suit) => availableCards[suit] > 0);
       let selectedSuit: Suits | null = null;
       let limit = 0;
-      while (!selectedSuit || limit < 50) { // Prevent infinite loop
+      while (!selectedSuit && limit < 50) { // Prevent infinite loop
         const randomSuit = availableSuits[Math.floor(Math.random() * availableSuits.length)];
         if (availableCards[randomSuit] > 0) {
           selectedSuit = randomSuit;
         }
         limit++;
+      }
+
+      if (!selectedSuit) {
+        throw new Error("No suit selected after 50 attempts");
       }
 
       this.playersCardState[playerId][selectedSuit]++;
