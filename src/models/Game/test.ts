@@ -2,18 +2,18 @@ import { describe, it, beforeEach } from "jsr:@std/testing/bdd";
 import { expect } from "jsr:@std/expect";
 
 import { FiggieGame } from "./index.ts";
-import { COLOR_PAIRS, Suits } from "./constants.ts";
+import { COLOR_PAIRS } from "./constants.ts";
 
 describe("FiggieGame", () => {
+    let game: FiggieGame;
+    beforeEach(() => {
+        game = new FiggieGame("test", "test", "test");
+    });
     it("should construct the game state correctly", () => {
-        const game = new FiggieGame("test", "test", "test");
-        game.initGame();
         expect(game.getGameId()).toBe("test");
     });
     describe("initializing the game", () => {
-        let game: FiggieGame;
         beforeEach(() => {
-            game = new FiggieGame("test", "test", "test");
             game.initGame();
         });
 
