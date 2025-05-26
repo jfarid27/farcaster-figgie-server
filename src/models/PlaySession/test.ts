@@ -2,7 +2,7 @@ import { describe, it, beforeEach } from "jsr:@std/testing/bdd";
 import { expect } from "jsr:@std/expect";
 
 import { PlaySession, Players, PlayerCardState } from "./index.ts";
-import { FiggieGame } from "../Game/index.ts";
+import { FiggieGame, GameState } from "../Game/index.ts";
 import { Suits } from "../Game/constants.ts";
 
 
@@ -37,8 +37,13 @@ describe("PlaySession", () => {
       expect(cardState["test4"]).toBeDefined();
     });
     describe("suit distribution", () => {
+        let commonSuit: Suits | undefined;
+        let gameState: GameState | undefined;
+        beforeEach(() => {
+            gameState = playSession.getGame()?.getGameState();
+            commonSuit = gameState?.commonSuit;
+        });
         it("the common suit should have 12 cards", () => {
-            const commonSuit = playSession.getGame()?.getGameState().commonSuit;
             expect(commonSuit).toBeDefined();
             if (!commonSuit) return;
             const total = cardState["test"][commonSuit] +
@@ -46,6 +51,30 @@ describe("PlaySession", () => {
                 cardState["test3"][commonSuit] +
                 cardState["test4"][commonSuit];
             expect(total).toBe(12);
+        });
+        it("suits should have distributed correctly",() => {
+            expect(commonSuit && gameState).toBeDefined();
+            if (!commonSuit || !gameState) return;
+
+            const suitTotals = {
+                [Suits.CLUBS]: 0,
+                [Suits.DIAMONDS]: 0,
+                [Suits.HEARTS]: 0,
+                [Suits.SPADES]: 0,
+            };
+            
+            for (const player in cardState) {
+                for (const suit of gameState.suits) {
+                    suitTotals[suit] += cardState[player][suit];
+                }
+            }
+
+            const expectedDistribution = [12, 10, 8];
+            expect(suitTotals[commonSuit], "common suit should be 12").toBe(12);
+            expect(expectedDistribution, "Clubs should be in the distribution").toContain(suitTotals[Suits.CLUBS]);
+            expect(expectedDistribution, "Diamonds should be in the distribution").toContain(suitTotals[Suits.DIAMONDS]);
+            expect(expectedDistribution, "Hearts should be in the distribution").toContain(suitTotals[Suits.HEARTS]);
+            expect(expectedDistribution, "Spades should be in the distribution").toContain(suitTotals[Suits.SPADES]);
         });
 
     });

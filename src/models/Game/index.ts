@@ -1,6 +1,6 @@
 import { Suits, COLOR_PAIRS, generateRandomSuits } from './constants.ts';
 
-type GameState = {
+export type GameState = {
   suits: Suits[];
   goalSuit: Suits;
   commonSuit: Suits;
