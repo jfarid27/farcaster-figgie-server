@@ -76,7 +76,26 @@ describe("PlaySession", () => {
             expect(expectedDistribution, "Hearts should be in the distribution").toContain(suitTotals[Suits.HEARTS]);
             expect(expectedDistribution, "Spades should be in the distribution").toContain(suitTotals[Suits.SPADES]);
         });
+        it("should have correct distribution of cards per suit", () => {
+            expect(commonSuit && gameState).toBeDefined();
+            if (!commonSuit || !gameState) return;
 
+            const suitTotals = {
+                [Suits.CLUBS]: 0,
+                [Suits.DIAMONDS]: 0,
+                [Suits.HEARTS]: 0,
+                [Suits.SPADES]: 0,
+            };
+            
+            for (const player in cardState) {
+                for (const suit of gameState.suits) {
+                    suitTotals[suit] += cardState[player][suit];
+                }
+            }
+
+            const distribution = Object.values(suitTotals).sort((a, b) => b - a);
+            expect(distribution).toEqual([12, 10, 10, 8]);
+        });
     });
     describe("player checks", () => {
       it("total cards should be 40", () => {
