@@ -1,0 +1,31 @@
+name: Deno CI
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    name: Run Deno tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+          cache: true
+
+      - name: Cache Deno dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/deno
+            ${{ github.workspace }}/.deno
+          key: ${{ runner.os }}-deno-${{ hashFiles('**/deno.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-deno-
+
+      - name: Run tests
+        run: deno test --v8-flags="--random_seed=100" --allow-read --allow-net --allow-env
