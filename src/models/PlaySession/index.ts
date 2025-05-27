@@ -1,12 +1,7 @@
 import { FiggieGame } from "../Game/index.ts";
 import { Suits } from "../Game/constants.ts";
 
-export class InvalidPlayerNumberError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "InvalidPlayerNumberError";
-  }
-}
+import { InvalidPlayerNumberError, InsufficientFundsError, InsufficientCardsError } from "./errors.ts";
 
 export type PlayerId = string;
 
@@ -27,7 +22,7 @@ export type CardState = {
 export type PlayerCardState = Record<PlayerId, CardState>;
 
 export class PlaySession {
-
+  public readonly DEFAULT_STARTING_FUNDS = 350;
   private playersCardState?: PlayerCardState;
   private playersFundsState?: PlayerFundsState;
 
@@ -36,9 +31,6 @@ export class PlaySession {
     public game: FiggieGame,
     public players: Players,
   ) {
-    this.playersFundsState = Object.fromEntries(
-      Object.keys(this.players).map((playerId) => [playerId, 0]),
-    ) as PlayerFundsState;
   }
 
   public getGame(): FiggieGame | undefined {
@@ -47,6 +39,12 @@ export class PlaySession {
 
   public getPlayers(): Players {
     return this.players;
+  }
+
+  public initializePlayersFundsState(startingFunds: number = this.DEFAULT_STARTING_FUNDS): void {
+    this.playersFundsState = Object.fromEntries(
+      Object.keys(this.players).map((playerId) => [playerId, startingFunds]),
+    ) as PlayerFundsState;
   }
 
   public initializeRandomPlayersCardState(): void {
@@ -104,7 +102,6 @@ export class PlaySession {
 
   }
 
-
   public getPlayersCardState(): PlayerCardState {
     if (!this.playersCardState) {
       throw new Error("Players card state not initialized");
@@ -118,4 +115,43 @@ export class PlaySession {
     }
     return this.playersFundsState;
   }
+
+  public getPlayerFunds(playerId: PlayerId): number {
+    if (!this.playersFundsState) {
+      throw new Error("Players funds state not initialized");
+    }
+    return this.playersFundsState[playerId];
+  }
+
+  /**
+   * PlayerTo pays PlayerFrom amount of funds for a card of the specifid suit.
+   * @param playerFromId - The player to take the card from
+   * @param playerToId - The player to give the card to
+   * @param suit - The suit of the card to swap
+   * @param amount - The amount of funds to swap
+   */
+  public swapCardForFunds(
+    playerFromId: PlayerId,
+    playerToId: PlayerId,
+    suit: Suits,
+    amount: number
+  ): void {
+    if (!this.playersFundsState) {
+      throw new InsufficientFundsError("Players funds state not initialized");
+    }
+    if (!this.playersCardState) {
+      throw new InsufficientCardsError("Players card state not initialized");
+    }
+    if (this.playersFundsState[playerFromId] < amount) {
+      throw new InsufficientFundsError("Player does not have enough funds");
+    }
+    if (this.playersCardState[playerFromId][suit] < 1) {
+      throw new InsufficientCardsError("Player does not have enough cards");
+    }
+    this.playersFundsState[playerFromId] += amount;
+    this.playersCardState[playerFromId][suit]--;
+    this.playersFundsState[playerToId] -= amount;
+    this.playersCardState[playerToId][suit]++;
+  }
+  
 }
