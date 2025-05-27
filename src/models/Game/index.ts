@@ -1,5 +1,5 @@
 import { Suits, COLOR_PAIRS, generateRandomSuits } from './constants.ts';
-
+import { InvalidGameStateError } from './errors.ts';
 export type GameState = {
   suits: Suits[];
   goalSuit: Suits;
@@ -41,9 +41,9 @@ export class FiggieGame {
     };
   }
 
-  public getGameState(): GameState {
+  public getGameState(): GameState | InvalidGameStateError {
     if (!this.gameState) {
-      throw new Error("Game state not initialized");
+      return new InvalidGameStateError("Game state not initialized");
     }
     return this.gameState;
   }

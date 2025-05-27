@@ -3,6 +3,8 @@ import { expect } from "jsr:@std/expect";
 
 import { FiggieGame } from "./index.ts";
 import { COLOR_PAIRS } from "./constants.ts";
+import { InvalidGameStateError } from "./errors.ts";
+import { assert } from "@std/assert";
 
 describe("FiggieGame", () => {
     let game: FiggieGame;
@@ -19,6 +21,7 @@ describe("FiggieGame", () => {
 
         it("should initialize the game state", () => {
             const gameState = game.getGameState();
+            assert(!(gameState instanceof InvalidGameStateError));
             expect(gameState.suits.length).toBe(4);
             expect(gameState.goalSuit).toBeDefined();
             expect(gameState.commonSuit).toBeDefined();
@@ -26,6 +29,7 @@ describe("FiggieGame", () => {
         });
         it("should initialize the correct goal and common suit colors", () => {
             const gameState = game.getGameState();
+            assert(!(gameState instanceof InvalidGameStateError));
             expect(gameState.goalSuit).toBe(COLOR_PAIRS[gameState.commonSuit]);
         });
     });

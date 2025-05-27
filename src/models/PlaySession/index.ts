@@ -2,6 +2,7 @@ import { FiggieGame } from "../Game/index.ts";
 import { Suits } from "../Game/constants.ts";
 
 import { InvalidPlayerNumberError, InsufficientFundsError, InsufficientCardsError } from "./errors.ts";
+import { InvalidGameStateError } from "../Game/errors.ts";
 
 export type PlayerId = string;
 
@@ -33,7 +34,7 @@ export class PlaySession {
   ) {
   }
 
-  public getGame(): FiggieGame | undefined {
+  public getGame(): FiggieGame {
     return this.game;
   }
 
@@ -41,19 +42,25 @@ export class PlaySession {
     return this.players;
   }
 
-  public initializePlayersFundsState(startingFunds: number = this.DEFAULT_STARTING_FUNDS): void {
+  public initializePlayersFundsState(startingFunds: number = this.DEFAULT_STARTING_FUNDS): PlaySession | InsufficientFundsError {
     this.playersFundsState = Object.fromEntries(
       Object.keys(this.players).map((playerId) => [playerId, startingFunds]),
     ) as PlayerFundsState;
+    return this;
   }
 
-  public initializeRandomPlayersCardState(): void {
+  public initializeRandomPlayersCardState(): PlaySession | InvalidPlayerNumberError | InvalidGameStateError {
 
     if (Object.keys(this.players).length > 5 || Object.keys(this.players).length < 4) {
-      throw new InvalidPlayerNumberError("Invalid number of players");
+      return new InvalidPlayerNumberError("Invalid number of players");
     }
 
-    const availableCards = Object.assign({}, this.game.getGameState().cardState);
+    const gameState = this.game.getGameState();
+    if (gameState instanceof InvalidGameStateError) {
+      return gameState;
+    }
+
+    const availableCards = Object.assign({}, gameState.cardState);
 
     this.playersCardState = Object.fromEntries(
       Object.keys(this.players).map((playerId) => [playerId, {
@@ -64,7 +71,7 @@ export class PlaySession {
       }]),
     ) as PlayerCardState;
 
-    let totalCards = Object.values(availableCards).reduce((acc, curr) => acc + curr, 0);
+    let totalCards: number = Object.values(availableCards).reduce((acc, curr) => acc + curr, 0);
     let hardLimit = 40;
 
     const players = Object.keys(this.players);
@@ -100,25 +107,26 @@ export class PlaySession {
       hardLimit--;
     }
 
+    return this;
   }
 
-  public getPlayersCardState(): PlayerCardState {
+  public getPlayersCardState(): PlayerCardState | InsufficientCardsError {
     if (!this.playersCardState) {
-      throw new Error("Players card state not initialized");
+      return new InsufficientCardsError("Players card state not initialized");
     }
     return this.playersCardState;
   }
 
-  public getPlayersFundsState(): PlayerFundsState {
+  public getPlayersFundsState(): PlayerFundsState | InsufficientFundsError {
     if (!this.playersFundsState) {
-      throw new Error("Players funds state not initialized");
+      return new InsufficientFundsError("Players funds state not initialized");
     }
     return this.playersFundsState;
   }
 
-  public getPlayerFunds(playerId: PlayerId): number {
+  public getPlayerFunds(playerId: PlayerId): number | InsufficientFundsError {
     if (!this.playersFundsState) {
-      throw new Error("Players funds state not initialized");
+      return new InsufficientFundsError("Players funds state not initialized");
     }
     return this.playersFundsState[playerId];
   }
@@ -135,23 +143,24 @@ export class PlaySession {
     playerToId: PlayerId,
     suit: Suits,
     amount: number
-  ): void {
+  ): PlaySession | InsufficientFundsError | InsufficientCardsError {
     if (!this.playersFundsState) {
-      throw new InsufficientFundsError("Players funds state not initialized");
+      return new InsufficientFundsError("Players funds state not initialized");
     }
     if (!this.playersCardState) {
-      throw new InsufficientCardsError("Players card state not initialized");
+      return new InsufficientCardsError("Players card state not initialized");
     }
     if (this.playersFundsState[playerFromId] < amount) {
-      throw new InsufficientFundsError("Player does not have enough funds");
+      return new InsufficientFundsError("Player does not have enough funds");
     }
     if (this.playersCardState[playerFromId][suit] < 1) {
-      throw new InsufficientCardsError("Player does not have enough cards");
+      return new InsufficientCardsError("Player does not have enough cards");
     }
     this.playersFundsState[playerFromId] += amount;
     this.playersCardState[playerFromId][suit]--;
     this.playersFundsState[playerToId] -= amount;
     this.playersCardState[playerToId][suit]++;
+    return this;
   }
   
 }
