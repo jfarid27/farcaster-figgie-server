@@ -1,27 +1,44 @@
 import { FiggieGame } from "../Game/index.ts";
 import { Suits } from "../Game/constants.ts";
 
+export class InvalidPlayerNumberError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidPlayerNumberError";
+  }
+}
+
+export type PlayerId = string;
+
 export type Player = {
-  id: string;
+  id: PlayerId;
   name: string;
   socket: WebSocket;
 }
 
-export type Players = Record<string, Player>;
+export type Players = Record<PlayerId, Player>;
 
-export type PlayerCardState = {
-    [key in Suits]: number;
+export type PlayerFundsState = Record<PlayerId, number>;
+
+export type CardState = {
+  [key in Suits]: number;
 }
+
+export type PlayerCardState = Record<PlayerId, CardState>;
 
 export class PlaySession {
 
-  private playersCardState?: Record<string, PlayerCardState>;
+  private playersCardState?: PlayerCardState;
+  private playersFundsState?: PlayerFundsState;
 
   constructor(
     public id: string,
     public game: FiggieGame,
     public players: Players,
   ) {
+    this.playersFundsState = Object.fromEntries(
+      Object.keys(this.players).map((playerId) => [playerId, 0]),
+    ) as PlayerFundsState;
   }
 
   public getGame(): FiggieGame | undefined {
@@ -31,7 +48,12 @@ export class PlaySession {
   public getPlayers(): Players {
     return this.players;
   }
+
   public initializeRandomPlayersCardState(): void {
+
+    if (Object.keys(this.players).length > 5 || Object.keys(this.players).length < 4) {
+      throw new InvalidPlayerNumberError("Invalid number of players");
+    }
 
     const availableCards = Object.assign({}, this.game.getGameState().cardState);
 
@@ -42,7 +64,7 @@ export class PlaySession {
         [Suits.HEARTS]: 0,
         [Suits.SPADES]: 0,
       }]),
-    ) as Record<string, PlayerCardState>;
+    ) as PlayerCardState;
 
     let totalCards = Object.values(availableCards).reduce((acc, curr) => acc + curr, 0);
     let hardLimit = 40;
@@ -83,10 +105,17 @@ export class PlaySession {
   }
 
 
-  public getPlayersCardState(): Record<string, PlayerCardState> {
+  public getPlayersCardState(): PlayerCardState {
     if (!this.playersCardState) {
       throw new Error("Players card state not initialized");
     }
     return this.playersCardState;
+  }
+
+  public getPlayersFundsState(): PlayerFundsState {
+    if (!this.playersFundsState) {
+      throw new Error("Players funds state not initialized");
+    }
+    return this.playersFundsState;
   }
 }
