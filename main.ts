@@ -1,7 +1,8 @@
+// @ts-types="npm:@types/express"
 import express from "npm:express";
-import { WebSocketServer } from "npm:ws";
-import jwt from "npm:jsonwebtoken";
-import { verifyMessage } from "npm:ethers";
+// @ts-types="npm:@types/ws"
+import { type WebSocket, WebSocketServer } from "npm:ws";
+import { authenticateSWIFJWT, verifySWIFJWT } from "./src/server/Farcaster.ts"
 
 import { FiggieGame } from "./src/models/Game/index.ts";
 import { PlaySession, Players } from "./src/models/PlaySession/index.ts";
@@ -11,9 +12,6 @@ const port = Number(Deno.env.get('PORT') ?? '3000');
 
 app.use(express.json());
 
-const JWT_SECRET = Deno.env.get('JWT_SECRET') ?? 'change_me';
-
-// Simple in-memory caches
 const tokenCache = new Map<string, string>(); // address -> jwt
 
 interface Lobby {
@@ -26,55 +24,7 @@ interface Lobby {
 
 const lobbies = new Map<string, Lobby>();
 
-// Verify the Farcaster sign in message using ethers
-async function verifySignInMessage(
-  message: string,
-  signature: string,
-  address: string,
-): Promise<boolean> {
-  try {
-    const recovered = verifyMessage(message, signature);
-    return recovered.toLowerCase() === address.toLowerCase();
-  } catch (_err) {
-    return false;
-  }
-}
-
-// POST /login - verify message and issue JWT
-app.post('/login', async (req, res) => {
-  const { message, signature, address } = req.body ?? {};
-  if (!message || !signature || !address) {
-    return res.status(400).json({ error: 'Invalid payload' });
-  }
-  const ok = await verifySignInMessage(message, signature, address);
-  if (!ok) {
-    return res.status(401).json({ error: 'Verification failed' });
-  }
-  const token = jwt.sign({ address }, JWT_SECRET, { expiresIn: '1h' });
-  tokenCache.set(address, token);
-  return res.json({ token });
-});
-
-function authenticate(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const auth = req.headers.authorization;
-  if (!auth) {
-    return res.status(401).json({ error: 'Missing token' });
-  }
-  const token = auth.split(' ')[1];
-  try {
-    const payload = jwt.verify(token, JWT_SECRET) as { address: string };
-    if (tokenCache.get(payload.address) !== token) {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
-    (req as any).user = payload.address;
-    next();
-  } catch (_err) {
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-}
-
-// POST /lobby - create a lobby, limit to one per user and max two lobbies
-app.post('/lobby', authenticate, (req, res) => {
+app.post('/lobby', authenticateSWIFJWT, (req, res) => {
   const user = (req as any).user as string;
   for (const lobby of lobbies.values()) {
     if (lobby.creator === user) {
@@ -98,7 +48,7 @@ const server = app.listen(port, () => {
 
 const wss = new WebSocketServer({ server });
 
-wss.on('connection', (ws, req) => {
+wss.on('connection', (ws: WebSocket, req: express.Request) => {
   const url = new URL(req.url ?? '/', 'http://localhost');
   const parts = url.pathname.split('/');
   const lobbyId = parts.length > 2 ? parts[2] : undefined;
@@ -108,37 +58,37 @@ wss.on('connection', (ws, req) => {
     return;
   }
   let address: string;
-  try {
-    const payload = jwt.verify(token, JWT_SECRET) as { address: string };
-    if (tokenCache.get(payload.address) !== token) {
+
+  verifySWIFJWT(token).then((payload) => {
+    if (tokenCache.get(payload.address as string) !== token) {
       ws.close();
       return;
     }
-    address = payload.address;
-  } catch (_err) {
-    ws.close();
-    return;
-  }
-  const lobby = lobbies.get(lobbyId);
-  if (!lobby) {
-    ws.close();
-    return;
-  }
-  lobby.players.set(address, ws);
-
-  ws.on('message', (data) => {
-    try {
-      const msg = JSON.parse(data.toString());
-      if (msg.type === 'close' && address === lobby.creator) {
-        closeLobby(lobbyId);
-      }
-    } catch {
-      // ignore malformed messages
+    address = payload.address as string;
+    const lobby = lobbies.get(lobbyId);
+    if (!lobby) {
+      ws.close();
+      return;
     }
-  });
+    lobby.players.set(address, ws);
 
-  ws.on('close', () => {
-    lobby.players.delete(address);
+    ws.on('message', (data: any) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        if (msg.type === 'close' && address === lobby.creator) {
+          closeLobby(lobbyId);
+        }
+      } catch {
+        // ignore malformed messages
+      }
+    });
+
+    ws.on('close', () => {
+      lobby.players.delete(address);
+    });
+  }).catch(() => {
+    ws.close();
+    return;
   });
 });
 
